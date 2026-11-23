@@ -1,0 +1,443 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated workspace member profile with RBAC role and department metadata.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "manager", "engineering", "legal", "finance", "viewer"]
+        },
+        "department": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "department", "createdAt", "updatedAt"]
+    },
+    "RoleGrant": {
+      "title": "RoleGrant",
+      "description": "Admin-managed role and capability grant mapped to a colleague email address.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "manager", "engineering", "legal", "finance", "viewer"]
+        },
+        "department": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "canUpload": {
+          "type": "boolean"
+        },
+        "canManageConnectors": {
+          "type": "boolean"
+        },
+        "canExport": {
+          "type": "boolean"
+        },
+        "grantedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "displayName", "role", "department", "canUpload", "canManageConnectors", "canExport", "grantedBy", "createdAt", "updatedAt"]
+    },
+    "KnowledgeDocument": {
+      "title": "KnowledgeDocument",
+      "description": "Uploaded PDF/document or synced external knowledge record with RBAC and transmission policies.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "fileType": {
+          "type": "string",
+          "enum": ["pdf", "txt", "md", "csv", "json", "connector"]
+        },
+        "fileSize": {
+          "type": "integer"
+        },
+        "pageCount": {
+          "type": "integer"
+        },
+        "chunkCount": {
+          "type": "integer"
+        },
+        "department": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "classification": {
+          "type": "string",
+          "enum": ["public_internal", "confidential", "restricted"]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["private", "role_restricted", "organization"]
+        },
+        "allowedRoles": {
+          "type": "array"
+        },
+        "allowedEmails": {
+          "type": "array"
+        },
+        "allowAiQuery": {
+          "type": "boolean"
+        },
+        "allowDownload": {
+          "type": "boolean"
+        },
+        "redactPiiOnTransmit": {
+          "type": "boolean"
+        },
+        "allowExternalShare": {
+          "type": "boolean"
+        },
+        "sourceType": {
+          "type": "string",
+          "enum": ["manual_upload", "confluence", "notion", "slack", "webhook"]
+        },
+        "sourceConnectorId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "ownerEmail": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "title",
+        "fileName",
+        "fileType",
+        "fileSize",
+        "pageCount",
+        "chunkCount",
+        "department",
+        "classification",
+        "visibility",
+        "allowedRoles",
+        "allowedEmails",
+        "allowAiQuery",
+        "allowDownload",
+        "redactPiiOnTransmit",
+        "allowExternalShare",
+        "sourceType",
+        "sourceConnectorId",
+        "ownerId",
+        "ownerEmail",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DocumentChunk": {
+      "title": "DocumentChunk",
+      "description": "Verbatim page-indexed text segment extracted from a KnowledgeDocument.",
+      "type": "object",
+      "properties": {
+        "docId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["private", "role_restricted", "organization"]
+        },
+        "allowedEmails": {
+          "type": "array"
+        },
+        "chunkIndex": {
+          "type": "integer"
+        },
+        "pageNumber": {
+          "type": "integer"
+        },
+        "sectionTitle": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "charCount": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["docId", "ownerId", "visibility", "allowedEmails", "chunkIndex", "pageNumber", "sectionTitle", "text", "charCount", "createdAt"]
+    },
+    "EnterpriseConnector": {
+      "title": "EnterpriseConnector",
+      "description": "External enterprise knowledge tool connector configuration with default RBAC and transmission settings.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["confluence", "notion", "slack", "webhook"]
+        },
+        "endpointUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "paused"]
+        },
+        "defaultVisibility": {
+          "type": "string",
+          "enum": ["private", "role_restricted", "organization"]
+        },
+        "defaultAllowedRoles": {
+          "type": "array"
+        },
+        "allowAiQuery": {
+          "type": "boolean"
+        },
+        "redactPiiOnTransmit": {
+          "type": "boolean"
+        },
+        "lastSyncedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "syncedDocCount": {
+          "type": "integer"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "provider",
+        "endpointUrl",
+        "status",
+        "defaultVisibility",
+        "defaultAllowedRoles",
+        "allowAiQuery",
+        "redactPiiOnTransmit",
+        "lastSyncedAt",
+        "syncedDocCount",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and data transmission audit log entry.",
+      "type": "object",
+      "properties": {
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "actorEmail": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "actorRole": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "action": {
+          "type": "string",
+          "enum": ["document_upload", "ai_query", "ai_abstain", "policy_update", "connector_sync", "role_grant", "access_denied", "document_delete"]
+        },
+        "targetId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "targetTitle": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "details": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "piiRedacted": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["actorUid", "actorEmail", "actorRole", "action", "targetId", "targetTitle", "details", "piiRedacted", "createdAt"]
+    },
+    "SearchAnalytic": {
+      "title": "SearchAnalytic",
+      "description": "Anonymized enterprise query telemetry for visualizing frequent search topics and knowledge gaps.",
+      "type": "object",
+      "properties": {
+        "orgScope": {
+          "type": "string",
+          "enum": ["enterprise"]
+        },
+        "normalizedQuery": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "rawQuery": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "department": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["answered", "knowledge_gap"]
+        },
+        "citationCount": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["orgScope", "normalizedQuery", "rawQuery", "department", "outcome", "citationCount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/userProfiles/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Signed-in user profile and RBAC role record."
+    },
+    "/roleGrants/{grantId}": {
+      "schema": { "$ref": "#/entities/RoleGrant" },
+      "description": "Admin-managed colleague role assignments and granular permissions."
+    },
+    "/documents/{docId}": {
+      "schema": { "$ref": "#/entities/KnowledgeDocument" },
+      "description": "Uploaded or synced enterprise knowledge documents with RBAC and transmission controls."
+    },
+    "/documents/{docId}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/DocumentChunk" },
+      "description": "Page-indexed verbatim text chunks for grounded Q&A."
+    },
+    "/connectors/{connectorId}": {
+      "schema": { "$ref": "#/entities/EnterpriseConnector" },
+      "description": "Configured external tool integrations and default ingestion policies."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Append-only security and transmission audit trail."
+    },
+    "/searchAnalytics/{eventId}": {
+      "schema": { "$ref": "#/entities/SearchAnalytic" },
+      "description": "Anonymized enterprise query frequencies and knowledge gap events."
+    }
+  }
+}

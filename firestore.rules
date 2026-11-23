@@ -1,0 +1,360 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Hardened Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true && request.auth.token.email is string;
+    }
+
+    function isTokenAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'pk9114712@gmail.com';
+    }
+
+    function isAdmin() {
+      return isTokenAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidRole(role) {
+      return role in ['admin', 'manager', 'engineering', 'legal', 'finance', 'viewer'];
+    }
+
+    function isValidStringList(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 254));
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'department', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'department', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        isValidRole(data.role) &&
+        data.department is string && data.department.size() >= 1 && data.department.size() <= 80 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRoleGrant(data) {
+      return data.keys().hasAll(['email', 'displayName', 'role', 'department', 'canUpload', 'canManageConnectors', 'canExport', 'grantedBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['email', 'displayName', 'role', 'department', 'canUpload', 'canManageConnectors', 'canExport', 'grantedBy', 'createdAt', 'updatedAt']) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        isValidRole(data.role) &&
+        data.department is string && data.department.size() >= 1 && data.department.size() <= 80 &&
+        data.canUpload is bool &&
+        data.canManageConnectors is bool &&
+        data.canExport is bool &&
+        data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidDocument(data) {
+      return data.keys().hasAll([
+          'title', 'fileName', 'fileType', 'fileSize', 'pageCount', 'chunkCount',
+          'department', 'classification', 'visibility', 'allowedRoles', 'allowedEmails',
+          'allowAiQuery', 'allowDownload', 'redactPiiOnTransmit', 'allowExternalShare',
+          'sourceType', 'sourceConnectorId', 'ownerId', 'ownerEmail', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title', 'fileName', 'fileType', 'fileSize', 'pageCount', 'chunkCount',
+          'department', 'classification', 'visibility', 'allowedRoles', 'allowedEmails',
+          'allowAiQuery', 'allowDownload', 'redactPiiOnTransmit', 'allowExternalShare',
+          'sourceType', 'sourceConnectorId', 'ownerId', 'ownerEmail', 'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+        data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 240 &&
+        data.fileType in ['pdf', 'txt', 'md', 'csv', 'json', 'connector'] &&
+        data.fileSize is int && data.fileSize >= 0 && data.fileSize <= 52428800 &&
+        data.pageCount is int && data.pageCount >= 1 && data.pageCount <= 5000 &&
+        data.chunkCount is int && data.chunkCount >= 1 && data.chunkCount <= 5000 &&
+        data.department is string && data.department.size() >= 1 && data.department.size() <= 80 &&
+        data.classification in ['public_internal', 'confidential', 'restricted'] &&
+        data.visibility in ['private', 'role_restricted', 'organization'] &&
+        isValidStringList(data.allowedRoles, 10) &&
+        isValidStringList(data.allowedEmails, 25) &&
+        data.allowAiQuery is bool &&
+        data.allowDownload is bool &&
+        data.redactPiiOnTransmit is bool &&
+        data.allowExternalShare is bool &&
+        data.sourceType in ['manual_upload', 'confluence', 'notion', 'slack', 'webhook'] &&
+        data.sourceConnectorId is string && data.sourceConnectorId.size() <= 128 &&
+        isValidId(data.ownerId) &&
+        data.ownerEmail is string && data.ownerEmail.size() >= 3 && data.ownerEmail.size() <= 254 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidChunk(data) {
+      return data.keys().hasAll([
+          'docId', 'ownerId', 'visibility', 'allowedEmails',
+          'chunkIndex', 'pageNumber', 'sectionTitle', 'text', 'charCount', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'docId', 'ownerId', 'visibility', 'allowedEmails',
+          'chunkIndex', 'pageNumber', 'sectionTitle', 'text', 'charCount', 'createdAt'
+        ]) &&
+        isValidId(data.docId) &&
+        isValidId(data.ownerId) &&
+        data.visibility in ['private', 'role_restricted', 'organization'] &&
+        isValidStringList(data.allowedEmails, 25) &&
+        data.chunkIndex is int && data.chunkIndex >= 0 && data.chunkIndex <= 5000 &&
+        data.pageNumber is int && data.pageNumber >= 1 && data.pageNumber <= 5000 &&
+        data.sectionTitle is string && data.sectionTitle.size() <= 200 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 12000 &&
+        data.charCount is int && data.charCount >= 1 && data.charCount <= 12000 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidConnector(data) {
+      return data.keys().hasAll([
+          'name', 'provider', 'endpointUrl', 'status', 'defaultVisibility',
+          'defaultAllowedRoles', 'allowAiQuery', 'redactPiiOnTransmit',
+          'lastSyncedAt', 'syncedDocCount', 'ownerId', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'name', 'provider', 'endpointUrl', 'status', 'defaultVisibility',
+          'defaultAllowedRoles', 'allowAiQuery', 'redactPiiOnTransmit',
+          'lastSyncedAt', 'syncedDocCount', 'ownerId', 'createdAt', 'updatedAt'
+        ]) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.provider in ['confluence', 'notion', 'slack', 'webhook'] &&
+        data.endpointUrl is string && data.endpointUrl.size() <= 500 &&
+        data.status in ['active', 'paused'] &&
+        data.defaultVisibility in ['private', 'role_restricted', 'organization'] &&
+        isValidStringList(data.defaultAllowedRoles, 10) &&
+        data.allowAiQuery is bool &&
+        data.redactPiiOnTransmit is bool &&
+        data.lastSyncedAt is string && data.lastSyncedAt.size() <= 64 &&
+        data.syncedDocCount is int && data.syncedDocCount >= 0 &&
+        isValidId(data.ownerId) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll([
+          'actorUid', 'actorEmail', 'actorRole', 'action',
+          'targetId', 'targetTitle', 'details', 'piiRedacted', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'actorUid', 'actorEmail', 'actorRole', 'action',
+          'targetId', 'targetTitle', 'details', 'piiRedacted', 'createdAt'
+        ]) &&
+        isValidId(data.actorUid) &&
+        data.actorEmail is string && data.actorEmail.size() >= 3 && data.actorEmail.size() <= 254 &&
+        data.actorRole is string && data.actorRole.size() >= 1 && data.actorRole.size() <= 40 &&
+        data.action in ['document_upload', 'ai_query', 'ai_abstain', 'policy_update', 'connector_sync', 'role_grant', 'access_denied', 'document_delete'] &&
+        data.targetId is string && data.targetId.size() <= 128 &&
+        data.targetTitle is string && data.targetTitle.size() <= 200 &&
+        data.details is string && data.details.size() >= 1 && data.details.size() <= 600 &&
+        data.piiRedacted is bool &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSearchAnalytic(data) {
+      return data.keys().hasAll([
+          'orgScope', 'normalizedQuery', 'rawQuery', 'department', 'outcome', 'citationCount', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orgScope', 'normalizedQuery', 'rawQuery', 'department', 'outcome', 'citationCount', 'createdAt'
+        ]) &&
+        data.orgScope == 'enterprise' &&
+        data.normalizedQuery is string && data.normalizedQuery.size() >= 1 && data.normalizedQuery.size() <= 200 &&
+        data.rawQuery is string && data.rawQuery.size() >= 1 && data.rawQuery.size() <= 240 &&
+        data.department is string && data.department.size() >= 1 && data.department.size() <= 80 &&
+        data.outcome in ['answered', 'knowledge_gap'] &&
+        data.citationCount is int && data.citationCount >= 0 && data.citationCount <= 500 &&
+        data.createdAt is timestamp;
+    }
+
+    function canReadDocData(docData) {
+      return isTokenAdmin() ||
+        docData.ownerId == request.auth.uid ||
+        docData.visibility == 'organization' ||
+        request.auth.token.email in docData.allowedEmails ||
+        (
+          exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.role in docData.allowedRoles
+        );
+    }
+
+    // --- Collection: userProfiles ---
+    match /userProfiles/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isTokenAdmin();
+      allow create: if isVerifiedUser() && isValidId(userId) && isOwner(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().email == request.auth.token.email &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (isTokenAdmin() && incoming().role == 'admin') ||
+          (!isTokenAdmin() && incoming().role == 'viewer')
+        );
+      allow update: if isVerifiedUser() && isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (isOwner(userId) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'department', 'updatedAt']))
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // --- Collection: roleGrants ---
+    match /roleGrants/{grantId} {
+      allow get: if isVerifiedUser() && isValidId(grantId) && (isAdmin() || existing().email == request.auth.token.email);
+      allow list: if isVerifiedUser() && (isTokenAdmin() || existing().email == request.auth.token.email);
+      allow create: if isAdmin() && isValidId(grantId) && isValidRoleGrant(incoming()) &&
+        incoming().grantedBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(grantId) && isValidRoleGrant(incoming()) &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(grantId);
+    }
+
+    // --- Collection: documents ---
+    match /documents/{docId} {
+      allow get: if isVerifiedUser() && isValidId(docId) && canReadDocData(existing());
+      allow list: if isVerifiedUser() && (
+        isTokenAdmin() ||
+        existing().ownerId == request.auth.uid ||
+        existing().visibility == 'organization' ||
+        request.auth.token.email in existing().allowedEmails
+      );
+      allow create: if isVerifiedUser() && isValidId(docId) && isValidDocument(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(docId) && isValidDocument(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'department', 'classification', 'visibility',
+            'allowedRoles', 'allowedEmails', 'allowAiQuery',
+            'allowDownload', 'redactPiiOnTransmit', 'allowExternalShare', 'updatedAt'
+          ]))
+        );
+      allow delete: if isVerifiedUser() && isValidId(docId) && (isAdmin() || existing().ownerId == request.auth.uid);
+
+      // --- Subcollection: chunks (Master Gate) ---
+      match /chunks/{chunkId} {
+        allow get: if isVerifiedUser() && isValidId(docId) && isValidId(chunkId) &&
+          exists(/databases/$(database)/documents/documents/$(docId)) &&
+          canReadDocData(get(/databases/$(database)/documents/documents/$(docId)).data);
+        allow list: if isVerifiedUser() && isValidId(docId) && (
+          isTokenAdmin() ||
+          existing().ownerId == request.auth.uid ||
+          existing().visibility == 'organization' ||
+          request.auth.token.email in existing().allowedEmails
+        );
+        allow create: if isVerifiedUser() && isValidId(docId) && isValidId(chunkId) &&
+          isValidChunk(incoming()) &&
+          incoming().docId == docId &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/documents/$(docId)) &&
+          (isAdmin() || get(/databases/$(database)/documents/documents/$(docId)).data.ownerId == request.auth.uid);
+        allow update: if isVerifiedUser() && isValidId(docId) && isValidId(chunkId) &&
+          isValidChunk(incoming()) &&
+          incoming().docId == existing().docId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          exists(/databases/$(database)/documents/documents/$(docId)) &&
+          (isAdmin() || get(/databases/$(database)/documents/documents/$(docId)).data.ownerId == request.auth.uid) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['visibility', 'allowedEmails']);
+        allow delete: if isVerifiedUser() && isValidId(docId) && isValidId(chunkId) &&
+          exists(/databases/$(database)/documents/documents/$(docId)) &&
+          (isAdmin() || get(/databases/$(database)/documents/documents/$(docId)).data.ownerId == request.auth.uid);
+      }
+    }
+
+    // --- Collection: connectors ---
+    match /connectors/{connectorId} {
+      allow get: if isVerifiedUser() && isValidId(connectorId) && (isAdmin() || existing().ownerId == request.auth.uid);
+      allow list: if isVerifiedUser() && (isTokenAdmin() || existing().ownerId == request.auth.uid);
+      allow create: if isVerifiedUser() && isValidId(connectorId) && isValidConnector(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(connectorId) && isValidConnector(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'endpointUrl', 'status', 'defaultVisibility',
+            'defaultAllowedRoles', 'allowAiQuery', 'redactPiiOnTransmit',
+            'lastSyncedAt', 'syncedDocCount', 'updatedAt'
+          ]))
+        );
+      allow delete: if isVerifiedUser() && isValidId(connectorId) && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    // --- Collection: auditLogs ---
+    match /auditLogs/{logId} {
+      allow get: if isVerifiedUser() && isValidId(logId) && (isAdmin() || existing().actorUid == request.auth.uid);
+      allow list: if isVerifiedUser() && (isTokenAdmin() || existing().actorUid == request.auth.uid);
+      allow create: if isVerifiedUser() && isValidId(logId) && isValidAuditLog(incoming()) &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().actorEmail == request.auth.token.email &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // --- Collection: searchAnalytics ---
+    match /searchAnalytics/{eventId} {
+      allow get: if isVerifiedUser() && isValidId(eventId) && existing().orgScope == 'enterprise';
+      allow list: if isVerifiedUser() && existing().orgScope == 'enterprise';
+      allow create: if isVerifiedUser() && isValidId(eventId) && isValidSearchAnalytic(incoming()) &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(eventId);
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Kestrel Knowledge",
+  "description": "Zero-hallucination AI-powered B2B enterprise knowledge management platform with manual PDF ingestion, external tool connectors, RBAC, and granular transmission controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
